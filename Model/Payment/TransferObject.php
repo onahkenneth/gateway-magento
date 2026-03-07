@@ -279,7 +279,7 @@ class TransferObject extends DataObject
      */
     public function isFraudDetected(): bool
     {
-        return isset($this->getData('txn')->fraud) && $this->getData('txn')->fraud->resultCode;
+        return isset($this->getData('txn')->fraud) && isset($this->getData('txn')->fraud->resultCode);
     }
 
     /**
@@ -351,6 +351,14 @@ class TransferObject extends DataObject
         }
 
         $to->setTransactionAdditionalInfo('transactionInfo', $this);
+
+        if ($to->getCaptureOperationCalled()) {
+            $to->setTransactionAdditionalInfo('transactionInfo', []);
+            $to->setTransactionAdditionalInfo(
+                Order\Payment\Transaction::RAW_DETAILS,
+                $this->getPaymentData()
+            );
+        }
     }
 
     /**
@@ -358,7 +366,13 @@ class TransferObject extends DataObject
      */
     public function getPaymentData(): array
     {
-        return ConvertArray::toFlatArray(json_decode(json_encode($this->toArray()['txn']), true));
+        return ConvertArray::toFlatArray(
+            json_decode(
+                json_encode(
+                    $this->toArray()['txn']
+                ), true
+            )
+        );
     }
 
     /**
