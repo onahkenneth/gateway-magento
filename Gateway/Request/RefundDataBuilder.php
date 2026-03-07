@@ -45,7 +45,7 @@ class RefundDataBuilder implements BuilderInterface
         $order = $paymentDO->getOrder();
         $payment = $paymentDO->getPayment();
 
-        $transactionId = $payment->getCcTransId();
+        $transactionId = $payment->getLastTransId();
 
         if (!$transactionId) {
             throw new LocalizedException(__('No capture transaction to proceed refund.'));
