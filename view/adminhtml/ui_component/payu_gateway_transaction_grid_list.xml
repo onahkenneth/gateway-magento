@@ -76,7 +76,7 @@
                 <item name="config" xsi:type="array">
                     <item name="selectProvider" xsi:type="string">payu_gateway_transaction_grid_list.payu_gateway_transaction_grid_list.grid_record_columns.ids</item>
                     <item name="component" xsi:type="string">Magento_Ui/js/grid/tree-massactions</item>
-                    <item name="indexField" xsi:type="string">id</item>
+                    <item name="indexField" xsi:type="string">entity_id</item>
                 </item>
             </argument>
             <action name="delete">
@@ -106,15 +106,26 @@
         </paging>
     </container>
     <columns name="grid_record_columns">
+        <argument name="data" xsi:type="array">
+            <item name="config" xsi:type="array">
+                <item name="defaultSortField" xsi:type="string">entity_id</item>
+                <item name="defaultSortDirection" xsi:type="string">desc</item>
+            </item>
+        </argument>
         <selectionsColumn name="ids">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
                     <item name="indexField" xsi:type="string">entity_id</item>
-                    <item name="sorting" xsi:type="string">desc</item>
-                    <item name="sortOrder" xsi:type="number">0</item>
                 </item>
             </argument>
         </selectionsColumn>
+        <column name="entity_id">
+            <argument name="data" xsi:type="array">
+                <item name="config" xsi:type="array">
+                    <item name="visible" xsi:type="boolean">false</item>
+                </item>
+            </argument>
+        </column>
         <column name="increment_id">
             <argument name="data" xsi:type="array">
                 <item name="config" xsi:type="array">
@@ -138,7 +149,7 @@
             <settings>
                 <filter>select</filter>
                 <dataType>select</dataType>
-                <options class="PayU\EasyPlus\Model\Config\Source\UiComponent\Lock"/>
+                <options class="PayU\Gateway\Model\Config\Source\UiComponent\Lock"/>
             </settings>
         </column>
         <column name="status" component="Magento_Ui/js/grid/columns/select">
@@ -150,7 +161,7 @@
             <settings>
                 <filter>select</filter>
                 <dataType>select</dataType>
-                <options class="PayU\EasyPlus\Model\Config\Source\UiComponent\Status"/>
+                <options class="PayU\Gateway\Model\Config\Source\UiComponent\Status"/>
             </settings>
         </column>
         <column name="process_id">
