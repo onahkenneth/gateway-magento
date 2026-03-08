@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PayU\Gateway\Model\Payment\Operations;
 
 use Exception;
+use Magento\Framework\DataObject;
 use Magento\Framework\DB\Transaction;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Session\Generic;
@@ -54,19 +55,22 @@ class CreateInvoiceOperation
 
     /**
      * @param OrderInterface $order
-     * @return void
+     * @param DataObject $transactionInfo
+     * @return OrderInterface
      * @throws LocalizedException
      */
-    public function invoice(OrderInterface $order, string $processId, string $processClass): void
+    public function invoice(OrderInterface $order, DataObject $transactionInfo): OrderInterface
     {
         $id = $order->getIncrementId();
+        $processId = $transactionInfo->getProcessId();
+        $processClass = $transactionInfo->getProcessClass();
 
         try {
             $order->setCanSendNewEmailFlag(true);
             $this->orderSender->send($order);
 
             $this->logger->debug(
-                ['info' => "($id) ($processId) ($processClass) : can_invoice (initial check): " . $order->canInvoice()]
+                ['info' => "($id) ($processId) ($processClass) : can_invoice (initial check): " . ($order->canInvoice() ? 'yes' : 'no')]
             );
 
             if ($order->canInvoice()) {
@@ -77,7 +81,7 @@ class CreateInvoiceOperation
                  */
                 $dupOrder = $this->orderFactory->create()->loadByIncrementId($order->getIncrementId());
                 $this->logger->debug(
-                    ['info' => "($id) ($processId) ($processClass) : can_invoice (double check): " . $order->canInvoice()]
+                    ['info' => "($id) ($processId) ($processClass) : can_invoice (double check): " . ($order->canInvoice() ? 'yes' : 'no')]
                 );
 
                 if (!$dupOrder->canInvoice()) {
@@ -85,29 +89,29 @@ class CreateInvoiceOperation
                     goto cannot_invoice_marker;
                 }
 
-                $status = $this->orderConfig->getStateDefaultStatus('processing');
-                $order->setState('processing')->setStatus($status);
+                $payment = $order->getPayment();
+                $payment->setCaptureOperationCalled(true);
+                $payment->setParentTransactionId($transactionInfo->getTranxId());
 
                 $invoice = $this->invoiceService->prepareInvoice($order);
-                $invoice->setRequestedCaptureCase(Invoice::CAPTURE_OFFLINE);
+                $invoice->setRequestedCaptureCase(Invoice::CAPTURE_ONLINE);
                 $invoice->register();
 
-                $transactionService = $this->transaction->addObject(
-                    $invoice
-                )->addObject(
-                    $invoice->getOrder()
-                );
+                // Always reference the order through the invoice AFTER register()
+                $order = $invoice->getOrder();
+                $payment->setCaptureOperationCalled(false);
+
+                $transactionService = $this->transaction
+                    ->addObject($invoice)
+                    ->addObject($order);
                 $transactionService->save();
+                $this->invoiceSender->send($invoice);
 
                 $this->logger->debug(['info' => "INVOICED => ($id) ($processId) ($processClass)"]);
 
-                $this->invoiceSender->send($invoice);
-
                 $order->addCommentToStatusHistory(
-                    __('Notified customer about invoice #%1.', $invoice->getId())
-                )->setIsCustomerNotified(true);
-
-                $this->orderRepository->save($order);
+                    __('Notified customer about invoice #%1.', $invoice->getIncrementId())
+                )->setIsCustomerNotified(1);
             } else {
                 /**
                  * Double Invoice Correction
@@ -116,8 +120,12 @@ class CreateInvoiceOperation
                 cannot_invoice_marker:
                 $this->logger->debug(['info' => "($id) ($processId) ($processClass) : already invoiced, skipped."]);
             }
-        } catch (Exception $e) {
-            throw new LocalizedException(__("Error encountered while capturing your order"));
+        } catch (Exception $ex) {
+            $payment->setCaptureOperationCalled(false);
+
+            throw new LocalizedException(__($ex->getMessage()));
         }
+
+        return $order;
     }
 }

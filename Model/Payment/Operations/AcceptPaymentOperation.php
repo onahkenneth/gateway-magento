@@ -10,7 +10,6 @@ namespace PayU\Gateway\Model\Payment\Operations;
 
 use Exception;
 use Magento\Framework\Exception\LocalizedException;
-use Magento\Payment\Model\InfoInterface;
 use Magento\Sales\Api\Data\OrderPaymentInterface;
 use PayU\Gateway\Model\Payment\AbstractOperation;
 
@@ -21,13 +20,12 @@ use PayU\Gateway\Model\Payment\AbstractOperation;
 class AcceptPaymentOperation extends AbstractOperation
 {
     /**
-     * @param InfoInterface $payment
-     * @param string $processId
-     * @param string $processClass
+     * @param OrderPaymentInterface $payment
+     * @param ?string $comment
      * @return void
      * @throws LocalizedException
      */
-    public function accept(OrderPaymentInterface $payment): void
+    public function accept(OrderPaymentInterface $payment, ?string $comment = null): void
     {
         $isError = false;
         $transactionInfo = $payment->getTransactionAdditionalInfo()['transactionInfo'];
@@ -38,29 +36,43 @@ class AcceptPaymentOperation extends AbstractOperation
 
         if ($orderIncrementId) {
             $order = $this->orderFactory->create()->loadByIncrementId($orderIncrementId);
-
             $orderPayment = $order->getPayment();
+            $message = "The payment transaction didn't work out because we can't find order.";
 
             if (!$orderPayment || $orderPayment->getMethod() !== $payment->getMethodInstance()->getCode()) {
                 throw new LocalizedException(
-                    __("The payment transaction didn't work out because we can't find order.")
+                    __($message)
                 );
             }
 
-            if ($order->getId()) {
+            $orderId = $order->getId();
+
+            if ((int)$orderId > 0 && $order->canInvoice()) {
                 try {
                     $this->validator->validate($order, $transactionInfo);
                     $this->fraudOperation->fraud($payment, $transactionInfo);
 
-                    $this->addStatusCommentOnUpdate($payment, $order, $transactionInfo);
-                    $this->updatePayment($payment, $transactionInfo);
+                    $order = $this->invoiceOperation->invoice($order, $transactionInfo);
 
-                    $this->invoiceOperation->invoice($order, $processId, $processClass);
-                    $this->transactionOperation->update($order, $payment, $transactionInfo);
+                    $this->transactionOperation->update($order, $transactionInfo);
+
+                    $this->updatePayment($order, $transactionInfo);
+                    $this->addStatusCommentOnUpdate($order, $payment, $transactionInfo);
+
+                    if ($comment) {
+                        $order->addCommentToStatusHistory($comment, 'processing');
+                    }
+
+                    $this->orderRepository->save($order);
                 } catch (LocalizedException|Exception $exception) {
-                    $order->addCommentToStatusHistory($exception->getMessage());
-
                     $isError = true;
+                    $this->logger->error(
+                        $exception->getMessage(),
+                        [
+                            'error' => "order ID => ($orderIncrementId) ($processId) ($processClass)" . PHP_EOL,
+                            "Stack trace:" . PHP_EOL => $exception->getTraceAsString()
+                        ]
+                    );
                 }
             } else {
                 $isError = true;
@@ -69,10 +81,8 @@ class AcceptPaymentOperation extends AbstractOperation
             $isError = true;
         }
 
-        $this->orderRepository->save($order);
-
         if ($isError) {
-            $responseText = "The payment transaction didn't work out.";
+            $responseText = "The payment transaction didn't work out. Error encountered while capturing your payment";
             $responseText = !$transactionInfo->isPaymentComplete()
                 ? __($transactionInfo->getResultMessage())
                 : __($responseText);
