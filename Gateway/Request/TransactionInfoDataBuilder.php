@@ -39,7 +39,7 @@ class TransactionInfoDataBuilder implements BuilderInterface
         $orderPayment = $paymentDO->getPayment();
 
         return [
-            self::PAYU_REFERENCE => $orderPayment->getLastTransId()
+            self::PAYU_REFERENCE => $orderPayment->getAdditionalInformation('payUReference')
         ];
     }
 }

@@ -55,14 +55,14 @@ abstract class AbstractOperation
 
     /**
      * @param OrderInterface $order
-     * @param DataObject $transactionInfo
      * @param OrderPaymentInterface $payment
+     * @param DataObject $transactionInfo
      * @return void
      */
     protected function addStatusCommentOnUpdate(
         OrderInterface $order,
+        OrderPaymentInterface $payment,
         DataObject $transactionInfo,
-        OrderPaymentInterface $payment
     ): void {
         $transactionId = $transactionInfo->getTranxId();
 
@@ -113,6 +113,7 @@ abstract class AbstractOperation
             ->setParentTransactionId(null)
             ->setIsTransactionClosed(true)
             ->setAdditionalInformation(
+                $payment->getAdditionalInformation() +
                 [Order\Payment\Transaction::RAW_DETAILS => $transactionInfo->getPaymentData()]
             )
             ->setTransactionAdditionalInfo(TransactionState::REAL_TRANSACTION_ID_KEY->value, $transactionInfo->getTranxId());

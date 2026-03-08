@@ -8,8 +8,10 @@ declare(strict_types=1);
 
 namespace PayU\Gateway\Model\Adapter;
 
+use Magento\Framework\Cache\FrontendInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\ObjectManagerInterface;
+use Magento\Framework\Serialize\SerializerInterface;
 use PayU\Gateway\Gateway\Config\Config;
 
 /**
@@ -24,11 +26,13 @@ class PayUAdapterFactory
     private readonly string $class;
 
     /**
-     * @param ObjectManagerInterface $objectManager
      * @param Config $config
+     * @param FrontendInterface $cache
+     * @param ObjectManagerInterface $objectManager
      */
     public function __construct(
         protected Config $config,
+        protected FrontendInterface $cache,
         protected ObjectManagerInterface $objectManager
     ) {
         $this->class = PayUAdapter::class;
@@ -58,7 +62,9 @@ class PayUAdapterFactory
                 'environment' => $this->config->getEnvironment($storeId),
                 'enterprise' => $this->config->isEnterprise($storeId),
                 'paymentMethods' => $this->config->getSupportedPaymentMethods($storeId),
-                'directoryList' => $this->objectManager->get(DirectoryList::class)
+                'cache' => $this->cache,
+                'directoryList' => $this->objectManager->get(DirectoryList::class),
+                'serializer' => $this->objectManager->get(SerializerInterface::class),
             ]
         );
     }

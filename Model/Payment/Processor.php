@@ -147,7 +147,7 @@ class Processor
             return;
         }
 
-        $this->ipnOperation->notify($order, $payment, $ipnData);
+        $this->ipnOperation->notify($payment, $ipnData);
     }
 
     /**
@@ -237,6 +237,11 @@ class Processor
     public function redirectTo(string $incrementId, string $payUReference): int
     {
         $order = $this->orderFactory->create()->loadByIncrementId($incrementId);
+
+        if ((int)$order->getId() === 0) {
+            throw new LocalizedException(__("Order not found"));
+        }
+
         $payment = $order->getPayment();
         $payment->setCaptureOperationCalled(false);
         $method = $payment->getMethodInstance();

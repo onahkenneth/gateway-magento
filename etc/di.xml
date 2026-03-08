@@ -1364,4 +1364,9 @@
             </argument>
         </arguments>
     </type>
+    <type name="PayU\Gateway\Model\Adapter\PayUAdapterFactory">
+        <arguments>
+            <argument name="cache" xsi:type="object">PayU\Gateway\Model\Cache\Type</argument>
+        </arguments>
+    </type>
 </config>
