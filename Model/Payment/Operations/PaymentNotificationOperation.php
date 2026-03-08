@@ -37,14 +37,12 @@ class PaymentNotificationOperation
     }
 
     /**
-     * @param OrderInterface $order
      * @param OrderPaymentInterface $payment
      * @param stdClass $ipnData
      * @return void
      * @throws LocalizedException
      */
     public function notify(
-        OrderInterface $order,
         OrderPaymentInterface $payment,
         stdClass $ipnData
     ): void {

@@ -353,11 +353,11 @@ class TransferObject extends DataObject
         $to->setTransactionAdditionalInfo('transactionInfo', $this);
 
         if ($to->getCaptureOperationCalled()) {
-            $to->setTransactionAdditionalInfo('transactionInfo', []);
             $to->setTransactionAdditionalInfo(
                 Order\Payment\Transaction::RAW_DETAILS,
                 $this->getPaymentData()
             );
+            $to->setTransactionAdditionalInfo('transactionInfo', []);
         }
     }
 
