@@ -366,13 +366,30 @@ class TransferObject extends DataObject
      */
     public function getPaymentData(): array
     {
-        return ConvertArray::toFlatArray(
+        return $this->toFlatArray(
             json_decode(
                 json_encode(
                     $this->toArray()['txn']
                 ), true
             )
         );
+    }
+
+    private function toFlatArray(array $data, string $prefix = ''): array
+    {
+        $result = [];
+
+        foreach ($data as $key => $value) {
+            $flatKey = $prefix !== '' ? $prefix . '_' . $key : $key;
+
+            if (is_array($value)) {
+                $result = array_merge($result, self::toFlatArray($value, $flatKey));
+            } else {
+                $result[$flatKey] = $value;
+            }
+        }
+
+        return $result;
     }
 
     /**

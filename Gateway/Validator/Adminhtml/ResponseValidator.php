@@ -28,8 +28,8 @@ class ResponseValidator extends DefaultResponseValidator
                     $isValid = $response->getSuccessful() === true;
                     return [
                         $isValid,
-                        [__(!$isValid ? $response->getResultMessage() : 'Transaction unsuccessful')],
-                        [__('N/A')]
+                        [__($response->getResultMessage())],
+                        [__($response->getResultCode())]
                     ];
                 }
             ]

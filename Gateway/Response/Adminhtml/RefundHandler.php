@@ -9,7 +9,7 @@ declare(strict_types=1);
 namespace PayU\Gateway\Gateway\Response\Adminhtml;
 
 use Magento\Payment\Gateway\Response\HandlerInterface;
-use Magento\Payment\Model\InfoInterface;
+use Magento\Sales\Model\Order\Payment\Transaction;
 use PayU\Gateway\Gateway\SubjectReader;
 
 /**
@@ -21,29 +21,32 @@ class RefundHandler implements HandlerInterface
     /**
      * @param SubjectReader $subjectReader
      */
-    public function __construct(
-        private readonly SubjectReader $subjectReader
-    ) {}
+    public function __construct(private readonly SubjectReader $subjectReader)
+    {}
 
     /**
      * @inheritDoc
      */
     public function handle(array $handlingSubject, array $response) {
+        $responseDO = $this->subjectReader->readResponse($response);
+
+        if (!$responseDO) {
+            return;
+        }
+
         $paymentDO = $this->subjectReader->readPayment($handlingSubject);
-        $orderPayment = $paymentDO->getPayment();
+        $payment = $paymentDO->getPayment();
+        $order = $payment->getOrder();
 
-        $this->shouldCloseParentTransaction($orderPayment);
-    }
 
-    /**
-     * Whether parent transaction should be closed
-     *
-     * @param InfoInterface $orderPayment
-     * @return bool
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
-    protected function shouldCloseParentTransaction(InfoInterface $orderPayment): bool
-    {
-        return !$orderPayment->getCreditmemo()->getInvoice()->canRefund();
+        $message = 'The refund amount of %1 %2 on the payment gateway. <br />PayU Reference: %3';
+        $message = __(
+            $message,
+            $payment->formatPrice($payment->getCreditmemo()->getBaseGrandTotal()),
+            $responseDO->getSuccessful() ? 'was succesfully credited' : 'is pending approval',
+            $responseDO->getPayUReference()
+        );
+        $order->addStatusHistoryComment($message);
+        $payment->setTransactionAdditionalInfo(Transaction::RAW_DETAILS, $responseDO->toArray());
     }
 }

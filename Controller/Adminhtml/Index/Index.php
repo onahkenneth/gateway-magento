@@ -17,11 +17,13 @@ use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Registry;
 use Magento\Sales\Api\OrderRepositoryInterface;
-use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use PayU\Gateway\Model\Trait\GetPayUReferenceTrait;
 
 class Index extends Action
 {
+    use GetPayUReferenceTrait;
+
     /**
      * @var string?
      */
@@ -101,7 +103,7 @@ class Index extends Action
         }
 
         $methodInstance = $payment->getMethodInstance();
-        $payUReference = $payment->getLastTransId();
+        $payUReference = $this->getPayUOrderReference($payment);
         $methodInstance->fetchTransactionInfo($payment, $payUReference);
 
         $transactionAdditionalInfo = $payment->getTransactionAdditionalInfo();

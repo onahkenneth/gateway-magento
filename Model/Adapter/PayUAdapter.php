@@ -138,13 +138,18 @@ class PayUAdapter
     }
 
     /**
-     * @param $reference
+     * @param string $reference
+     * @param string $orderId
      * @return Response
      * @throws LocalizedException
      */
-    public function search($reference): ResponseInterface
+    public function search(string $reference, string $orderId): ResponseInterface
     {
-        $cacheKey = \PayU\Gateway\Model\Cache\Type::TYPE_IDENTIFIER . "_" . $reference;
+        $cacheKey = implode('_', [
+            \PayU\Gateway\Model\Cache\Type::TYPE_IDENTIFIER,
+            $reference,
+            $orderId
+        ]);
         $data = $this->cache->load($cacheKey);
 
         if (!$data) {
@@ -184,11 +189,13 @@ class PayUAdapter
             ?? $attributes['payment']->getTransactionId()
             ?? $attributes['payment']->getLastTransId();
 
-        if (!$payUReference) {
-            throw new LocalizedException(__('Invalid payU Reference'));
+        $orderId = $attributes[TransactionInfoDataBuilder::ORDER_ID] ?? null;
+
+        if (!$payUReference || !$orderId) {
+            throw new LocalizedException(__("Invalid reference: $payUReference, order ID: $orderId"));
         }
 
-        return $this->search($payUReference);
+        return $this->search($payUReference, $orderId);
     }
 
     /**

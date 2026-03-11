@@ -19,6 +19,7 @@ use Magento\Sales\Api\TransactionRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Payment\Transaction\BuilderInterface;
 use PayU\Gateway\Gateway\Config\Config;
+use PayU\Gateway\Model\Trait\GetTransactionTrait;
 
 /**
  * class TransactionUpdateOperation
@@ -26,6 +27,8 @@ use PayU\Gateway\Gateway\Config\Config;
  */
 class TransactionUpdateOperation
 {
+    use GetTransactionTrait;
+
     /**
      * @param Config $config
      * @param FilterBuilder $filterBuilder
@@ -105,27 +108,5 @@ class TransactionUpdateOperation
             'authorize' => TransactionInterface::TYPE_AUTH,
             'authorize_capture' => TransactionInterface::TYPE_CAPTURE
         };
-    }
-
-    /**
-     * Get payment transaction
-     *
-     * @param ?string $txnId
-     * @return TransactionInterface|null
-     */
-    private function getTransaction(?string $txnId): ?TransactionInterface
-    {
-        $this->searchCriteriaBuilder->addFilters(
-            [
-                $this->filterBuilder
-                    ->setField('txn_id')
-                    ->setValue($txnId)
-                    ->create(),
-            ]
-        );
-        $searchCriteria = $this->searchCriteriaBuilder->create();
-        $result = $this->transactionRepository->getList($searchCriteria);
-
-        return $result->getTotalCount() > 0 ? current($result->getItems()) : null;
     }
 }

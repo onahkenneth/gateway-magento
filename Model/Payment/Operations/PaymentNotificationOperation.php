@@ -37,12 +37,14 @@ class PaymentNotificationOperation
     }
 
     /**
+     * @param OrderInterface $order
      * @param OrderPaymentInterface $payment
      * @param stdClass $ipnData
      * @return void
      * @throws LocalizedException
      */
     public function notify(
+        OrderInterface $order,
         OrderPaymentInterface $payment,
         stdClass $ipnData
     ): void {
@@ -93,8 +95,11 @@ class PaymentNotificationOperation
                 case 'FAILED':
                 case 'TIMEOUT':
                 case 'EXPIRED':
-                default:
                     $this->denyPaymentOperation->deny($payment, $comment);
+                    break;
+                default:
+                    $order->addCommentToStatusHistory($comment);
+                    $this->orderRepository->save($order);
             }
 
             $processId = $transactionInfo->getProcessId();

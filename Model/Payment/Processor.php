@@ -147,7 +147,7 @@ class Processor
             return;
         }
 
-        $this->ipnOperation->notify($payment, $ipnData);
+        $this->ipnOperation->notify($order, $payment, $ipnData);
     }
 
     /**
