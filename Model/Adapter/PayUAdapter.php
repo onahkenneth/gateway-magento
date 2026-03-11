@@ -9,8 +9,10 @@ declare(strict_types=1);
 namespace PayU\Gateway\Model\Adapter;
 
 use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\Cache\FrontendInterface;
 use Magento\Framework\Exception\FileSystemException;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Serialize\SerializerInterface;
 use PayU\Gateway\Gateway\Request\AdditionalInfoDataBuilder;
 use PayU\Gateway\Gateway\Request\AddressDataBuilder;
 use PayU\Gateway\Gateway\Request\BasketDataBuilder;
@@ -56,7 +58,9 @@ class PayUAdapter
      * @param string $environment
      * @param bool $enterprise
      * @param string $paymentMethods
+     * @param FrontendInterface $cache
      * @param DirectoryList $directoryList
+     * @param SerializerInterface $serializer
      */
     public function __construct(
         private readonly string $safeKey,
@@ -65,7 +69,9 @@ class PayUAdapter
         private readonly string $environment,
         private readonly bool   $enterprise,
         private readonly string $paymentMethods,
-        private readonly DirectoryList $directoryList
+        private readonly FrontendInterface $cache,
+        private readonly DirectoryList $directoryList,
+        private readonly SerializerInterface $serializer
     ) {
         $this->initApi();
     }
@@ -124,7 +130,7 @@ class PayUAdapter
 
     /**
      * @param array $attributes
-     * @return Resource
+     * @return Response
      */
     public function order(array $attributes): ResponseInterface
     {
@@ -132,20 +138,41 @@ class PayUAdapter
     }
 
     /**
-     * @param $reference
+     * @param string $reference
+     * @param string $orderId
      * @return Response
      * @throws LocalizedException
      */
-    public function search($reference): ResponseInterface
+    public function search(string $reference, string $orderId): ResponseInterface
     {
-        $search = new Search();
-        $search->setContext($this->apiContext)
-            ->setPayUReference($reference);
+        $cacheKey = implode('_', [
+            \PayU\Gateway\Model\Cache\Type::TYPE_IDENTIFIER,
+            $reference,
+            $orderId
+        ]);
+        $data = $this->cache->load($cacheKey);
 
-        $response = Processor::processAction('search', $search);
+        if (!$data) {
+            $search = new Search();
+            $search->setContext($this->apiContext)
+                ->setPayUReference($reference);
 
-        if (!$response->getResultCode()) {
-            throw new LocalizedException(__('PayU Gateway error encountered.'));
+            $response = Processor::processAction('search', $search);
+
+            if (!$response->getResultCode()) {
+                throw new LocalizedException(__('PayU Gateway error encountered.'));
+            }
+
+            $dataToCache = $response->toArray();
+            $this->cache->save(
+                $this->serializer->serialize($dataToCache),
+                $cacheKey,
+                [\PayU\Gateway\Model\Cache\Type::CACHE_TAG],
+                3600 // 1 hour
+            );
+        } else {
+            $data = $this->serializer->unserialize($data);
+            $response = new Response($data);
         }
 
         return $response;
@@ -162,11 +189,13 @@ class PayUAdapter
             ?? $attributes['payment']->getTransactionId()
             ?? $attributes['payment']->getLastTransId();
 
-        if (!$payUReference) {
-            throw new LocalizedException(__('Invalid payU Reference'));
+        $orderId = $attributes[TransactionInfoDataBuilder::ORDER_ID] ?? null;
+
+        if (!$payUReference || !$orderId) {
+            throw new LocalizedException(__("Invalid reference: $payUReference, order ID: $orderId"));
         }
 
-        return $this->search($payUReference);
+        return $this->search($payUReference, $orderId);
     }
 
     /**

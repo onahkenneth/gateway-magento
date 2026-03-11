@@ -224,11 +224,11 @@ abstract class AbstractAction implements ActionInterface, RedirectLoginInterface
 
             if ($payUReference && $reference !== $payUReference) {
                 $this->logger->debug([
-                    'info' => "PayU reference from request parameter: {$reference}, PayU reference in Magento session: "
+                    'error' => "PayU reference from request parameter: {$reference}, PayU reference in Magento session: "
                     . $payUReference
                 ]);
                 throw new LocalizedException(
-                    __('A wrong PayU Checkout Reference was specified.')
+                    __('Invalid PayU Checkout Reference.')
                 );
             }
         } else {

@@ -8,7 +8,7 @@
         "payu magento 2.4 and above"
     ],
     "type": "magento2-module",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "homepage": "https://southafrica.payu.com/",
     "license": [
         "OSL-3.0",

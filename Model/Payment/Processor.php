@@ -18,7 +18,6 @@ use Magento\Sales\Model\OrderRepository;
 use Magento\Sales\Model\Order\Payment;
 use PayU\Gateway\Model\Constants\RedirectPage;
 use PayU\Gateway\Model\Constants\ResultCode;
-use PayU\Gateway\Model\Constants\TransactionState;
 use PayU\Gateway\Model\Lock\TransactionFactory as TransactionLockFactory;
 use PayU\Gateway\Model\Payment\Operations\PaymentNotificationOperation;
 use PayU\Gateway\Model\ResourceModel\TransactionFactory as TransactionLockResourceFactory;
@@ -54,11 +53,17 @@ class Processor
      *
      * @param OrderInterface $order
      * @param string $payUReference
+     * @param string $processId
+     * @param string $name
      * @return array
      * @throws LocalizedException
      */
-    public function return(OrderInterface $order, string $payUReference, string $processId, string $processClass): array
-    {
+    public function return(
+        OrderInterface $order,
+        string $payUReference,
+        string $processId,
+        string $processClass
+    ): array {
         $payment = $order->getPayment();
         $method = $payment->getMethodInstance();
         $method->fetchTransactionInfo($payment, $payUReference);
@@ -92,15 +97,15 @@ class Processor
 
     /**
      * @param OrderInterface $order
-     * @param array $ipnData
+     * @param stdClass $ipnData
+     * @param string $processId
+     * @param string $processClass
      * @return void
      * @throws LocalizedException
      */
     public function notify(OrderInterface $order, stdClass $ipnData, string $processId, string $processClass): void
     {
-        if ($order->getState() === strtolower(TransactionState::PROCESSING->value) ||
-            $order->getStatus() == strtolower(TransactionState::PROCESSING->value)
-        ) {
+        if ($order->hasInvoices()) {
             $this->logger->debug(['info' => "IPN => ($processId) ($processClass) : order already processed.", 'response' => $ipnData]);
 
             return;
@@ -130,9 +135,10 @@ class Processor
         if (in_array($resultCode, array_column(ResultCode::cases(), 'value'))) {
             $comment = "<strong>-----PAYU NOTIFICATION RECEIVED---</strong><br />";
             $comment .= '<strong>Payment unsuccessful: </strong><br />';
+            $comment .= "Transaction Type: " . $transactionInfo->getTransactionType() . "<br />";
             $comment .= "PayU Reference: " . $transactionInfo->getTranxId() . "<br />";
             $comment .= "Point Of Failure: " . $transactionInfo->getPointOfFailure() . "<br />";
-            $comment .= "Result Code: " . $transactionInfo->getResultCode();
+            $comment .= "Result Code: " . $transactionInfo->getResultCode() . "<br />";
             $comment .= "Result Message: " . $transactionInfo->getResultMessage();
             $order->addCommentToStatusHistory($comment, true);
             $order->cancel();
@@ -196,10 +202,11 @@ class Processor
     /**
      * @param string $incrementId
      * @param string $processId
+     * @param string $status
      * @return void
-     * @throws AlreadyExistsException|Exception
+     * @throws AlreadyExistsException
      */
-    public function updateTransactionLog(string $incrementId, string $processId)
+    public function updateTransactionLog(string $incrementId, string $processId, string $status = 'complete')
     {
         $transaction = $this->transactionLockFactory->create();
         $resourceModel = $this->transactionLockResourceFactory->create();
@@ -214,7 +221,7 @@ class Processor
         }
 
         try {
-            $transaction->setStatus('complete');
+            $transaction->setStatus($status);
             $transaction->setLock(false);
             $resourceModel->save($transaction);
         } catch (AlreadyExistsException $exception) {
@@ -230,7 +237,13 @@ class Processor
     public function redirectTo(string $incrementId, string $payUReference): int
     {
         $order = $this->orderFactory->create()->loadByIncrementId($incrementId);
+
+        if ((int)$order->getId() === 0) {
+            throw new LocalizedException(__("Order not found"));
+        }
+
         $payment = $order->getPayment();
+        $payment->setCaptureOperationCalled(false);
         $method = $payment->getMethodInstance();
         $method->fetchTransactionInfo($payment, $payUReference);
 
@@ -261,7 +274,7 @@ class Processor
     }
 
     /**
-     * @param \Magento\Sales\Api\Data\OrderInterface $order
+     * @param OrderInterface $order
      * @return bool
      */
     public function isCancelPayflex(OrderInterface $order): bool
@@ -270,7 +283,7 @@ class Processor
     }
 
     /**
-     * @param \Magento\Sales\Api\Data\OrderInterface $order
+     * @param OrderInterface $order
      * @return bool
      */
     public function isMasterpassTimeout(OrderInterface $order): bool

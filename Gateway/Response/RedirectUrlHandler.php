@@ -49,7 +49,7 @@ class RedirectUrlHandler implements HandlerInterface
         $payUReference = $responseObj->getPayUReference();
         $payment->setAdditionalInformation('payUReference', $payUReference);
 
-        $message = 'Redirecting to PayU. PayU Reference: "%1"<br/>';
+        $message = 'Redirecting to PayU Gateway. <br />PayU Reference: "%1"';
         $message = __(
             $message,
             $payUReference

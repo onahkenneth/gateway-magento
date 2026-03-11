@@ -26,11 +26,13 @@ class PaymentNotificationOperation
      * @param Logger $logger
      * @param OrderRepositoryInterface $orderRepository
      * @param AcceptPaymentOperation $acceptPaymentOperation
+     * @param DenyPaymentOperation $denyPaymentOperation
      */
     public function __construct(
         private readonly Logger $logger,
         private readonly OrderRepositoryInterface $orderRepository,
-        private readonly AcceptPaymentOperation $acceptPaymentOperation
+        private readonly AcceptPaymentOperation $acceptPaymentOperation,
+        private readonly DenyPaymentOperation $denyPaymentOperation
     ) {
     }
 
@@ -46,9 +48,10 @@ class PaymentNotificationOperation
         OrderPaymentInterface $payment,
         stdClass $ipnData
     ): void {
-        $transactionInfo = $payment->getTransactionAdditionalInfo()['transactionInfo'];
+        $transactionInfo = $payment->getTransactionAdditionalInfo()['transactionInfo'] ?? null;
 
         if (
+            $transactionInfo &&
             in_array(
                 $transactionInfo->getTransactionState(),
                 array_column(TransactionState::cases(), 'value')
@@ -61,8 +64,9 @@ class PaymentNotificationOperation
             $comment .= "Order Amount: " . $totalDue . "<br />";
             $comment .= "Amount Paid: " . $totalPaid . "<br />";
             $comment .= "Merchant Reference : " . $transactionInfo->getMerchantReference() . "<br />";
+            $comment .= "Transaction Type: " . $transactionInfo->getTransactionType() . "<br />";
             $comment .= "PayU Reference: " . $transactionInfo->getTranxId() . "<br />";
-            $comment .= "PayU Payment Status: " . $transactionInfo->getTransactionState() . "<br /><br />";
+            $comment .= "Payment Status: " . $transactionInfo->getTransactionState() . "<br /><br />";
 
             if ($transactionInfo->hasPaymentMethod()) {
                 $paymentMethods = $ipnData->PaymentMethodsUsed;
@@ -86,24 +90,18 @@ class PaymentNotificationOperation
             switch ($transactionInfo->getTransactionState()) {
                 // Payment completed
                 case 'SUCCESSFUL':
-                    $order->addCommentToStatusHistory($comment, 'processing');
-                    $this->acceptPaymentOperation->accept($payment);
-                    break;
-                case 'PROCESSING':
-                    $order->addCommentToStatusHistory($comment);
+                    $this->acceptPaymentOperation->accept($payment, $comment);
                     break;
                 case 'FAILED':
                 case 'TIMEOUT':
                 case 'EXPIRED':
-                    $order->addCommentToStatusHistory($comment);
-                    $order->cancel();
+                    $this->denyPaymentOperation->deny($payment, $comment);
                     break;
                 default:
-                    $order->addCommentToStatusHistory($comment, true);
-                    break;
+                    $order->addCommentToStatusHistory($comment);
+                    $this->orderRepository->save($order);
             }
 
-            $this->orderRepository->save($order);
             $processId = $transactionInfo->getProcessId();
             $processClass = $transactionInfo->getProcessClass();
             $this->logger->debug(['info' => "IPN => ($processId) ($processClass): Processing complete."]);

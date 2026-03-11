@@ -47,10 +47,17 @@ class Response extends AbstractAction implements HttpGetActionInterface, HttpPos
         try {
             $payUReference = $this->getPayUReference();
 
-            $canProceed = $this->responseProcessor->canProceed($orderId, $processId, $processClass);
+            $canProceed = $this->responseProcessor->canProceed(
+                $orderId,
+                $processId,
+                $processClass
+            );
 
             if (!$canProceed) {
-                $page = $this->responseProcessor->redirectTo($orderId, $payUReference);
+                $page = $this->responseProcessor->redirectTo(
+                    $orderId,
+                    $payUReference
+                );
 
                 switch ($page) {
                     case RedirectPage::SUCCESS_PAGE->value:
@@ -160,7 +167,10 @@ class Response extends AbstractAction implements HttpGetActionInterface, HttpPos
 
                 $message = $successful[1];
 
-                if ($this->responseProcessor->isCancelPayflex($order) || $this->responseProcessor->isMasterpassTimeout($order)) {
+                if (
+                    $this->responseProcessor->isCancelPayflex($order) ||
+                    $this->responseProcessor->isMasterpassTimeout($order)
+                ) {
                     $this->messageManager->addErrorMessage($message);
 
                     return $this->returnToCart();
@@ -180,7 +190,10 @@ class Response extends AbstractAction implements HttpGetActionInterface, HttpPos
             $this->logger->debug([
                 'error' => "($processId) ($orderId) $processClass" . $exception->getMessage()
             ]);
-            $this->messageManager->addExceptionMessage($exception, __($exception->getMessage()));
+            $this->messageManager->addExceptionMessage(
+                $exception,
+                __($exception->getMessage())
+            );
             $this->clearSessionData();
         }
 

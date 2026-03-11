@@ -11,6 +11,7 @@ namespace PayU\Gateway\Gateway\Request;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Payment\Gateway\Request\BuilderInterface;
 use PayU\Gateway\Gateway\SubjectReader;
+use PayU\Gateway\Model\Trait\GetPayUReferenceTrait;
 use PayUSdk\Model\Currency;
 use PayUSdk\Model\Total;
 use PayUSdk\Model\Transaction;
@@ -21,6 +22,8 @@ use PayUSdk\Model\Transaction;
  */
 class RefundDataBuilder implements BuilderInterface
 {
+    use GetPayUReferenceTrait;
+
     public const TRANSACTION = 'transaction';
     public const PAYU_REFERENCE = 'payUReference';
     public const MERCHANT_REFERENCE = 'merchantReference';
@@ -45,10 +48,10 @@ class RefundDataBuilder implements BuilderInterface
         $order = $paymentDO->getOrder();
         $payment = $paymentDO->getPayment();
 
-        $transactionId = $payment->getCcTransId();
+        $transactionId = $this->getPayURefundReference($payment);
 
         if (!$transactionId) {
-            throw new LocalizedException(__('No capture transaction to proceed refund.'));
+            throw new LocalizedException(__('No capture transaction ID to proceed with refund.'));
         }
 
         $currency = new Currency(['code' => $order->getCurrencyCode()]);

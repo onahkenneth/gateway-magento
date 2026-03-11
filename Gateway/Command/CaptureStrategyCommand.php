@@ -60,7 +60,8 @@ class CaptureStrategyCommand implements CommandInterface
         $paymentDO = $this->subjectReader->readPayment($commandSubject);
 
         $command = $this->getCommand($paymentDO);
-        $this->commandPool->get($command)->execute($commandSubject);
+        $commandObj = $this->commandPool->get($command);
+        $commandObj->execute($commandSubject);
     }
 
     /**
@@ -75,8 +76,9 @@ class CaptureStrategyCommand implements CommandInterface
         $payment = $paymentDO->getPayment();
         ContextHelper::assertOrderPayment($payment);
 
+        // Allow invoice for order transactions to be capture online
         if ($this->isExistsOrderTransaction($payment)) {
-            throw new LocalizedException(__('No authorize transaction found'));
+            return self::FETCH_TXN_INFO;
         }
 
         // if auth transaction does not exist then execute authorize&capture command
@@ -84,7 +86,7 @@ class CaptureStrategyCommand implements CommandInterface
         $authorizeTxn = $payment->getAuthorizationTransaction();
 
         if (!$authorizeTxn && !$existsCapture) {
-            return self::FETCH_TXN_INFO;
+            return self::AUTHORIZE;
         }
 
         // do capture for authorization transaction
@@ -96,8 +98,7 @@ class CaptureStrategyCommand implements CommandInterface
             return self::CAPTURE;
         }
 
-        // process authorize
-        return self::AUTHORIZE;
+        return self::FETCH_TXN_INFO;
     }
 
     /**

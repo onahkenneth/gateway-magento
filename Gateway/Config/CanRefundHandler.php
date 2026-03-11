@@ -39,7 +39,10 @@ class CanRefundHandler implements ValueHandlerInterface
     {
         $paymentDO = $this->subjectReader->readPayment($subject);
         $payment = $paymentDO->getPayment();
+        $order = $payment->getOrder();
 
-        return $payment->getAmountPaid() > 0;
+        return $order->getTotalPaid() > 0 &&
+            $order->getTotalRefunded() <= $order->getTotalPaid() &&
+            $order->getTotalPaid() - $order->getTotalRefunded() >= 0;
     }
 }

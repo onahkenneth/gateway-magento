@@ -22,6 +22,8 @@
         <message code="P022">Transaction is not in the correct state.</message>
         <message code="P023">Transaction in progress</message>
         <message code="P047">Payment Error: (ref: P047)</message>
+        <!-- Refund -->
+        <message code="P019">Transaction amount must be equal to less than original transaction amount</message>
         <!-- EFT -->
         <message code="EFTPRO_003">Some error occurred at the payment gateway</message>
         <message code="EFTPRO_004">Transaction cancelled by user</message>

@@ -1261,8 +1261,8 @@
         <arguments>
             <argument name="client" xsi:type="object">PayU\Gateway\Gateway\Http\Client\TransactionRefund</argument>
             <argument name="requestBuilder" xsi:type="object">PayUGatewayRefundBuilder</argument>
-            <argument name="validator" xsi:type="object">PayU\Gateway\Gateway\Validator\ResponseValidator</argument>
-            <argument name="handler" xsi:type="object">PayU\Gateway\Gateway\Response\RefundHandler</argument>
+            <argument name="validator" xsi:type="object">PayU\Gateway\Gateway\Validator\Adminhtml\ResponseValidator</argument>
+            <argument name="handler" xsi:type="object">PayU\Gateway\Gateway\Response\Adminhtml\RefundHandler</argument>
             <argument name="transferFactory" xsi:type="object">PayU\Gateway\Gateway\Http\TransferFactory</argument>
             <argument name="errorMessageMapper" xsi:type="object">PayU\Gateway\Gateway\ErrorMapper\VirtualErrorMessageMapper</argument>
         </arguments>
@@ -1362,6 +1362,11 @@
             <argument name="collections" xsi:type="array">
                 <item name="payu_gateway_transaction_grid_list_data_source" xsi:type="string">PayU\Gateway\Model\ResourceModel\Transaction\Grid\Collection</item>
             </argument>
+        </arguments>
+    </type>
+    <type name="PayU\Gateway\Model\Adapter\PayUAdapterFactory">
+        <arguments>
+            <argument name="cache" xsi:type="object">PayU\Gateway\Model\Cache\Type</argument>
         </arguments>
     </type>
 </config>

@@ -83,7 +83,15 @@ class Notify extends AbstractAction implements HttpPostActionInterface, CsrfAwar
         }
 
         $this->respond('200', 'OK');
-        $this->responseProcessor->notify($order, $ipnData, $processId, $processClass);
+
+        try {
+            $this->responseProcessor->notify($order, $ipnData, $processId, $processClass);
+        } catch (LocalizedException $ex) {
+            $this->responseProcessor->updateTransactionLog($incrementId, $processId, 'error');
+
+            return $resultJson;
+        }
+
         $this->responseProcessor->updateTransactionLog($incrementId, $processId);
 
         return $resultJson;

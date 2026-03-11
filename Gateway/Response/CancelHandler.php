@@ -10,11 +10,12 @@ namespace PayU\Gateway\Gateway\Response;
 
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Payment\Gateway\Response\HandlerInterface;
-use Magento\Sales\Api\OrderPaymentRepositoryInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order\Payment;
 use Magento\Sales\Model\OrderFactory;
 use PayU\Gateway\Gateway\SubjectReader;
+use PayU\Gateway\Model\Payment\TransferObjectFactory;
+use PayU\Gateway\Model\Payment\Operations\TransactionUpdateOperation;
 
 /**
  * class CancelHandler
@@ -25,14 +26,16 @@ class CancelHandler implements HandlerInterface
     /**
      * @param SubjectReader $subjectReader
      * @param OrderFactory $orderFactory
+     * @param TransferObjectFactory $transferFactory
      * @param OrderRepositoryInterface $orderRepository
-     * @param OrderPaymentRepositoryInterface $paymentRepository
+     * @param TransactionUpdateOperation $transactionUpdateOps
      */
     public function __construct(
         private readonly SubjectReader $subjectReader,
         private readonly OrderFactory $orderFactory,
+        private readonly TransferObjectFactory $transferFactory,
         private readonly OrderRepositoryInterface $orderRepository,
-        private readonly OrderPaymentRepositoryInterface $paymentRepository
+        private readonly TransactionUpdateOperation $transactionUpdateOps
     ) {
     }
 
@@ -49,10 +52,10 @@ class CancelHandler implements HandlerInterface
         $orderPayment = $paymentDO->getPayment();
 
         $message = 'Payment transaction amount of %1 was canceled by user on PayU.<br/>' . 'PayU reference "%2"<br/>';
-        $responseObj = $this->subjectReader->readResponse($response);
+        $transactionInfo = $this->subjectReader->readResponse($response);
 
-        $payUReference = $responseObj->getPayUReference();
-        $incrementId = $responseObj->getMerchantReference();
+        $payUReference = $transactionInfo->getPayUReference();
+        $incrementId = $transactionInfo->getMerchantReference();
 
         if ($incrementId) {
             $order = $this->orderFactory->create()->loadByIncrementId($incrementId);
@@ -64,20 +67,26 @@ class CancelHandler implements HandlerInterface
                 );
             }
 
-            if ($order->getId()) {
+            if ((int)$order->getId() > 0) {
                 $message = __(
                     $message,
                     $order->getBaseCurrency()->formatTxt($order->getBaseTotalDue()),
                     $payUReference
                 );
 
-                $orderPayment->setIsTransactionClosed(true);
-                $orderPayment->setShouldCloseParentTransaction(true);
+                $payment->setAmountCanceled($payment->getBaseAmountOrdered());
+                $payment->setBaseAmountCanceled($payment->getBaseAmountOrdered());
+                $this->transactionUpdateOps->update(
+                    $order,
+                    $this->transferFactory->create(
+                        [
+                            'data' => ['txn' => json_decode($transactionInfo->toJson())]
+                        ]
+                    )
+                );
 
                 $order->addCommentToStatusHistory($message);
                 $order->cancel();
-
-                $this->paymentRepository->save($orderPayment);
                 $this->orderRepository->save($order);
             }
         }

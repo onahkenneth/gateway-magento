@@ -9,7 +9,7 @@ declare(strict_types=1);
 namespace PayU\Gateway\Model\Payment\Operations;
 
 use Magento\Framework\Exception\LocalizedException;
-use Magento\Payment\Model\InfoInterface;
+use Magento\Sales\Api\Data\OrderPaymentInterface;
 use PayU\Gateway\Model\Payment\AbstractOperation;
 use PayU\Gateway\Model\Payment\TransferObject;
 
@@ -20,21 +20,40 @@ use PayU\Gateway\Model\Payment\TransferObject;
 class DenyPaymentOperation extends AbstractOperation
 {
     /**
-     * @param InfoInterface $payment
+     * @param OrderPaymentInterface $payment
+     * @param ?string $comment
      * @return void
      * @throws LocalizedException
      */
-    public function deny(InfoInterface $payment): void
+    public function deny(OrderPaymentInterface $payment, ?string $comment = null): void
     {
         $order = $payment->getOrder();
-        $transactionAdditionalInfo = $payment->getTransactionAdditionalInfo();
+        $transactionInfo = $payment->getTransactionAdditionalInfo()['transactionInfo'];
 
+        $processId = $transactionInfo->getProcessId();
+        $processClass = $transactionInfo->getProcessClass();
+
+        if (!$order->canCancel()) {
+            $this->logger->debug(
+                "IPN => ($processId) ($processClass) : order already canceled.",
+            ['info' => "", 'response' => $transactionInfo]
+        );
+
+            return;
+        }
+
+        $transactionAdditionalInfo = $payment->getTransactionAdditionalInfo();
         /** @var TransferObject $transactionInfo */
         $transactionInfo = $transactionAdditionalInfo['transactionInfo'];
 
-        $this->transactionOperation->update($order, $payment, $transactionInfo);
-        $this->addStatusCommentOnUpdate($payment, $order, $transactionInfo);
         $order->cancel();
+
+        if ($comment) {
+            $order->addCommentToStatusHistory($comment, true);
+        }
+
+        $this->transactionOperation->update($order, $transactionInfo);
+        $this->addStatusCommentOnUpdate($order, $payment, $transactionInfo);
         $this->orderRepository->save($order);
     }
 }

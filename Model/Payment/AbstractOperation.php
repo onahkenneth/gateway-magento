@@ -9,7 +9,8 @@ declare(strict_types=1);
 namespace PayU\Gateway\Model\Payment;
 
 use Magento\Framework\DataObject;
-use Magento\Payment\Model\InfoInterface;
+use Magento\Sales\Api\Data\OrderInterface;
+use Magento\Sales\Api\Data\OrderPaymentInterface;
 use Magento\Sales\Api\OrderPaymentRepositoryInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
@@ -29,78 +30,90 @@ abstract class AbstractOperation
 {
     /**
      * @param Validator $validator
-     * @param OrderFactory $orderFactory
-     * @param CreateInvoiceOperation $invoiceOperation
-     * @param ProcessFraudOperation $fraudOperation
-     * @param TransactionUpdateOperation $transactionOperation
      * @param LoggerInterface $logger
+     * @param OrderFactory $orderFactory
      * @param BuilderInterface $transactionBuilder
+     * @param ProcessFraudOperation $fraudOperation
+     * @param CreateInvoiceOperation $invoiceOperation
      * @param OrderRepositoryInterface $orderRepository
-     * @param OrderPaymentRepositoryInterface $paymentRepository,
+     * @param TransactionUpdateOperation $transactionOperation
+     * @param OrderPaymentRepositoryInterface $paymentRepository
      */
     public function __construct(
         protected readonly Validator $validator,
-        protected readonly OrderFactory $orderFactory,
-        protected readonly CreateInvoiceOperation $invoiceOperation,
-        protected readonly TransactionUpdateOperation $transactionOperation,
-        protected readonly ProcessFraudOperation $fraudOperation,
         protected readonly LoggerInterface $logger,
+        protected readonly OrderFactory $orderFactory,
         protected readonly BuilderInterface $transactionBuilder,
-        protected OrderRepositoryInterface $orderRepository,
-        protected OrderPaymentRepositoryInterface $paymentRepository,
+        protected readonly ProcessFraudOperation $fraudOperation,
+        protected readonly CreateInvoiceOperation $invoiceOperation,
+        protected readonly OrderRepositoryInterface $orderRepository,
+        protected readonly TransactionUpdateOperation $transactionOperation,
+        protected readonly OrderPaymentRepositoryInterface $paymentRepository,
+
     ) {
     }
 
     /**
-     * @param InfoInterface $payment
-     * @param Order $order
+     * @param OrderInterface $order
+     * @param OrderPaymentInterface $payment
      * @param DataObject $transactionInfo
+     * @return void
      */
-    protected function addStatusCommentOnUpdate(InfoInterface $payment, Order $order, DataObject $transactionInfo): void
-    {
+    protected function addStatusCommentOnUpdate(
+        OrderInterface $order,
+        OrderPaymentInterface $payment,
+        DataObject $transactionInfo,
+    ): void {
         $transactionId = $transactionInfo->getTranxId();
 
         if ($payment->getIsTransactionApproved()) {
             $message = __(
-                'Transaction %1 has been approved. Amount %2. Transaction status is "%3"',
+                'Transaction %1 has been approved.  <br /> Amount %2 <br />Transaction type: %3  <br /> Transaction status: "%4"',
                 $transactionId,
-                $payment->getOrder()->getBaseCurrency()->formatTxt($payment->getAmountOrdered()),
+                $order->getBaseCurrency()->formatTxt($payment->getAmountOrdered()),
+                $transactionInfo->getTransactionType(),
                 $transactionInfo->getTransactionState()
             );
             $order->addCommentToStatusHistory($message);
         } elseif ($payment->getIsTransactionPending()) {
             $message = __(
-                'Transaction %1 is pending payment. Amount %2. Transaction status is "%3"',
+                'Transaction %1 is pending payment.  <br /> Amount %2 <br />Transaction type: %3  <br /> Transaction status: "%4"',
                 $transactionId,
-                $payment->getOrder()->getBaseCurrency()->formatTxt($payment->getAmountOrdered()),
+                $order->getBaseCurrency()->formatTxt($payment->getAmountOrdered()),
+                $transactionInfo->getTransactionType(),
                 $transactionInfo->getTransactionState()
             );
             $order->addCommentToStatusHistory($message);
         } elseif ($payment->getIsTransactionDenied()) {
             $message = __(
-                'Transaction %1 has been voided/declined. Transaction status is "%2". Amount %3.',
+                'Transaction %1 has been voided/declined.  <br /> Amount %2 <br />Transaction type: %3  <br /> Transaction status: "%4".',
                 $transactionId,
-                $transactionInfo->getTransactionState(),
-                $payment->getOrder()->getBaseCurrency()->formatTxt($payment->getAmountOrdered())
+                $order->getBaseCurrency()->formatTxt($payment->getAmountOrdered()),
+                $transactionInfo->getTransactionType(),
+                $transactionInfo->getTransactionState()
             );
             $order->addCommentToStatusHistory($message);
         }
+
+        $this->orderRepository->save($order);
     }
 
     /**
      * Fill payment with credit card data from response from PayU.
      *
-     * @param InfoInterface $payment
+     * @param OrderInterface $order
      * @param DataObject $transactionInfo
      * @return void
      */
-    protected function updatePayment(InfoInterface $payment, DataObject $transactionInfo): void
+    protected function updatePayment(OrderInterface $order, DataObject $transactionInfo): void
     {
+        $payment = $order->getPayment();
         $payment->setLastTransId($transactionInfo->getTranxId())
             ->setTransactionId($transactionInfo->getTranxId())
             ->setParentTransactionId(null)
             ->setIsTransactionClosed(true)
             ->setAdditionalInformation(
+                $payment->getAdditionalInformation() +
                 [Order\Payment\Transaction::RAW_DETAILS => $transactionInfo->getPaymentData()]
             )
             ->setTransactionAdditionalInfo(TransactionState::REAL_TRANSACTION_ID_KEY->value, $transactionInfo->getTranxId());
